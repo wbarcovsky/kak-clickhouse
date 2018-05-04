@@ -1,11 +1,10 @@
 <?php
 namespace kak\clickhouse;
 use Yii;
+use yii\db\BaseActiveRecord;
 
-class ActiveRecord extends \yii\db\ActiveRecord
+class ActiveRecord extends BaseActiveRecord
 {
-
-
     /**
      * Returns the connection used by this AR class.
      * @return mixed|Connection the database connection used by this AR class.
@@ -21,7 +20,7 @@ class ActiveRecord extends \yii\db\ActiveRecord
      */
     public static function find()
     {
-        return Yii::createObject(ActiveQuery::className(), [get_called_class()]);
+        return Yii::createObject(ActiveQuery::class, [get_called_class()]);
     }
 
     /**
