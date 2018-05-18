@@ -20,10 +20,28 @@ class ClickHouseTest extends \Codeception\Test\Unit
 
     protected function _before()
     {
+
+
     }
 
     protected function _after()
     {
+
+
+
+
+    }
+
+    public function testSaveDefaultModelValues()
+    {
+        $model = new TestTableModel;
+        $model->event_date = date('Y-m-d');
+        $resultSave = $model->save();
+
+        $this->assertTrue($resultSave, 'model errors:' . print_r($model->getErrors(), true));
+
+        var_dump($model->attributes);
+        var_dump($model->isNewRecord);
 
     }
 

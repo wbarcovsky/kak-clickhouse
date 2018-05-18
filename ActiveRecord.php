@@ -1,7 +1,8 @@
 <?php
 namespace kak\clickhouse;
 use Yii;
-use yii\db\BaseActiveRecord;
+use yii\db\ActiveRecord as BaseActiveRecord;
+use yii\db\Exception;
 
 class ActiveRecord extends BaseActiveRecord
 {
@@ -38,47 +39,16 @@ class ActiveRecord extends BaseActiveRecord
         return null;
     }
 
-
     /**
-     * Inserts the record into the database using the attribute values of this record.
-     *
-     * Usage example:
-     *
-     * ```php
-     * $customer = new Customer;
-     * $customer->name = $name;
-     * $customer->email = $email;
-     * $customer->insert();
-     * ```
-     *
-     * @param boolean $runValidation whether to perform validation (calling [[validate()]])
-     * before saving the record. Defaults to `true`. If the validation fails, the record
-     * will not be saved to the database and this method will return `false`.
-     * @param array $attributes list of attributes that need to be saved. Defaults to null,
-     * meaning all attributes that are loaded from DB will be saved.
-     * @return boolean whether the attributes are valid and the record is inserted successfully.
+     * Returns a value indicating whether the specified operation is transactional in the current [[$scenario]].
+     * @param int $operation the operation to check. Possible values are [[OP_INSERT]], [[OP_UPDATE]] and [[OP_DELETE]].
+     * @return bool whether the specified operation is transactional in the current [[scenario]].
      */
-    public function insert($runValidation = true, $attributes = null)
+    public function isTransactional($operation)
     {
-        if ($runValidation && !$this->validate($attributes)) {
-            Yii::info('Model not inserted due to validation error.', __METHOD__);
-            return false;
-        }
-        if (!$this->beforeSave(true)) {
-            return false;
-        }
-
-        $values = $this->getDirtyAttributes($attributes);
-        if ((static::getDb()->getSchema()->insert(static::tableName(), $values)) === false) {
-            return false;
-        }
-
-        $changedAttributes = array_fill_keys(array_keys($values), null);
-        $this->setOldAttributes($values);
-        $this->afterSave(true, $changedAttributes);
-        return true;
-
+        return false;
     }
+
 
 
 }

@@ -142,13 +142,13 @@ class Command extends BaseCommand
     public function execute($prepare = false)
     {
         $rawSql = $this->getRawSql();
+
         $response =  $this->db->transport
             ->createRequest()
             ->setUrl($this->getBaseUrl())
             ->setMethod('POST')
             ->setContent($rawSql)
             ->send();
-        
         $this->checkResponseStatus($response);
         
         if ($prepare) {
@@ -301,7 +301,7 @@ class Command extends BaseCommand
         $urlBase = $this->db->transport->baseUrl;
         return $this->db->buildUrl($urlBase, array_merge([
             'database' => $this->db->database
-        ],$this->getOptions()));
+        ], $this->getOptions()));
     }
 
     /**
