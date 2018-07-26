@@ -3,8 +3,9 @@ namespace kak\clickhouse;
 
 use yii\db\Expression;
 use yii\db\ExpressionInterface;
+use yii\db\QueryBuilder as BaseQueryBuilder;
 
-class QueryBuilder extends \yii\db\QueryBuilder
+class QueryBuilder extends BaseQueryBuilder
 {
 
     /**

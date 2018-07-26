@@ -22,7 +22,7 @@ class Connection extends \yii\db\Connection
     /**
      * @var string name use database default use value  "default"
      */
-    public $database;
+    public $database = 'default';
 
     /**
      * @var string the hostname or ip address to use for connecting to the click-house server. Defaults to 'localhost'.

@@ -4,11 +4,12 @@ namespace kak\clickhouse;
 
 
 use Yii;
-use yii\db\TableSchema;
 use yii\helpers\ArrayHelper;
 
 class Schema extends \yii\db\Schema
 {
+    const TYPE_RESOURCE = 'resource';
+
     /** @var $db Connection */
     public $db;
 
@@ -43,7 +44,6 @@ class Schema extends \yii\db\Schema
      * @param string $table the table that new rows will be inserted into.
      * @param array $columns the column data (name => value) to be inserted into the table.
      * @return array primary key values or false if the command fails
-     * @since 2.0.4
      */
     public function insert($table, $columns)
     {
@@ -61,7 +61,9 @@ class Schema extends \yii\db\Schema
     {
         $tableSchema = $this->getTableSchema($table);
         foreach ($columns as $name => $value) {
-            $columns[$name] = $tableSchema->columns[$name]->phpTypecast($value);
+            /** @var ColumnSchema $column */
+            $column = $tableSchema->columns[$name];
+            $columns[$name] = $column->dbTypecast($value);
         }
         return $columns;
     }
@@ -79,7 +81,7 @@ class Schema extends \yii\db\Schema
 
     public function createQueryBuilder()
     {
-        return new \kak\clickhouse\QueryBuilder($this->db);
+        return new QueryBuilder($this->db);
     }
 
     /**
@@ -145,14 +147,14 @@ class Schema extends \yii\db\Schema
         $sql = 'SELECT * FROM system.columns WHERE `table`=:name and `database`=:database FORMAT JSON';
         $result = $this->db->createCommand($sql, [
             ':name' => $name,
-            ':database' => $this->db->database === null ? 'default' : $this->db->database
+            ':database' => $this->db->database
         ])->queryAll();
 
         if ($result && isset($result[0])) {
             $table = new TableSchema();
             $table->schemaName = $result[0]['database'];
             $table->name = $name;
-            $table->fullName = $table->schemaName . '.' . $table->name;
+            $table->fullName = sprintf('%s.%s', $table->schemaName, $table->name);
 
             foreach ($result as $info) {
                 $column = $this->loadColumnSchema($info);
@@ -205,4 +207,6 @@ class Schema extends \yii\db\Schema
     {
         return Yii::createObject('kak\clickhouse\ColumnSchema');
     }
+
+
 }

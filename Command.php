@@ -7,6 +7,7 @@ use Yii;
 use yii\base\Exception;
 use yii\db\Command as BaseCommand;
 use yii\db\Exception as DbException;
+use yii\db\Expression;
 use yii\helpers\ArrayHelper;
 use yii\helpers\Json;
 
@@ -17,7 +18,6 @@ use yii\helpers\Json;
  */
 class Command extends BaseCommand
 {
-
     const FETCH = 'fetch';
     const FETCH_ALL = 'fetchAll';
     const FETCH_COLUMN = 'fetchColumn';
@@ -35,7 +35,7 @@ class Command extends BaseCommand
 
     private $_is_result;
 
-    private $_options =[];
+    private $_options = [];
 
     /**
      * @var
@@ -66,6 +66,10 @@ class Command extends BaseCommand
      */
     private $_rows_before_limit_at_least;
 
+    /**
+     * @var Connection
+     */
+    public $db;
 
     /**
      * @return null
@@ -74,7 +78,7 @@ class Command extends BaseCommand
     {
         return $this->_format;
     }
-    
+
     /**
      * @param null $format
      * @return $this
@@ -120,6 +124,10 @@ class Command extends BaseCommand
         return $this;
     }
 
+    /**
+     * @param array $values
+     * @return $this
+     */
     public function bindValues($values)
     {
         if (empty($values)) {
@@ -137,26 +145,27 @@ class Command extends BaseCommand
 
         return $this;
     }
-    
-    
+
+    /**
+     * @param bool $prepare
+     * @return array|mixed
+     */
     public function execute($prepare = false)
     {
         $rawSql = $this->getRawSql();
-
-        $response =  $this->db->transport
+        $response = $this->db->transport
             ->createRequest()
             ->setUrl($this->getBaseUrl())
             ->setMethod('POST')
             ->setContent($rawSql)
             ->send();
         $this->checkResponseStatus($response);
-        
+
         if ($prepare) {
             return $this->parseResponse($response);
         }
         return $response;
     }
-
 
     /**
      * @return array|mixed
@@ -165,7 +174,7 @@ class Command extends BaseCommand
     {
         return $this->queryInternal(self::FETCH_COLUMN);
     }
-    
+
     /**
      * Executes the SQL statement and returns the value of the first column in the first row of data.
      * This method is best used when only a single value is needed for a query.
@@ -176,9 +185,13 @@ class Command extends BaseCommand
     public function queryScalar()
     {
         $result = $this->queryInternal(self::FETCH_SCALAR, 0);
-        return (is_numeric($result)) ? ( $result + 0 ) : $result;
+        return (is_numeric($result)) ? ($result + 0) : $result;
     }
-    
+
+    /**
+     * Get raw sql string
+     * @return string
+     */
     public function getRawSql()
     {
         if (empty($this->params)) {
@@ -195,7 +208,7 @@ class Command extends BaseCommand
                 $params[$name] = ($value ? 'TRUE' : 'FALSE');
             } elseif ($value === null) {
                 $params[$name] = 'NULL';
-            } elseif (!is_object($value) && !is_resource($value)) {
+            } elseif ((!is_object($value) && !is_resource($value)) || $value instanceof Expression) {
                 $params[$name] = $value;
             }
         }
@@ -206,23 +219,27 @@ class Command extends BaseCommand
         foreach (explode('?', $this->getSql()) as $i => $part) {
             $sql .= (isset($params[$i]) ? $params[$i] : '') . $part;
         }
+
         return $sql;
     }
 
-
-
-
+    /**
+     * @param string $method
+     * @param null $fetchMode
+     * @return array|mixed
+     * @throws Exception
+     */
     protected function queryInternal($method, $fetchMode = null)
     {
 
         $rawSql = $this->getRawSql();
-        if ( $method ==  self::FETCH ) {
+        if ($method == self::FETCH) {
             if (preg_match('#^SELECT#is', $rawSql) && !preg_match('#LIMIT#is', $rawSql)) {
-                $rawSql.=' LIMIT 1';
+                $rawSql .= ' LIMIT 1';
             }
         }
-        if ($this->getFormat()===null && strpos($rawSql, 'FORMAT ')===false) {
-            $rawSql.=' FORMAT JSON';
+        if ($this->getFormat() === null && strpos($rawSql, 'FORMAT ') === false) {
+            $rawSql .= ' FORMAT JSON';
         }
         \Yii::info($rawSql, 'kak\clickhouse\Command::query');
 
@@ -252,7 +269,7 @@ class Command extends BaseCommand
         try {
             Yii::beginProfile($token, 'kak\clickhouse\Command::query');
 
-            $response =  $this->db->transport
+            $response = $this->db->transport
                 ->createRequest()
                 ->setUrl($this->getBaseUrl())
                 ->setMethod('POST')
@@ -267,7 +284,7 @@ class Command extends BaseCommand
             Yii::endProfile($token, 'kak\clickhouse\Command::query');
         } catch (\Exception $e) {
             Yii::endProfile($token, 'kak\clickhouse\Command::query');
-            throw new Exception("Query error: ".$e->getMessage());
+            throw new Exception("Query error: " . $e->getMessage());
         }
 
         if (isset($cache, $cacheKey, $info)) {
@@ -295,7 +312,9 @@ class Command extends BaseCommand
         ];
     }
 
-
+    /**
+     * @return mixed
+     */
     protected function getBaseUrl()
     {
         $urlBase = $this->db->transport->baseUrl;
@@ -315,17 +334,22 @@ class Command extends BaseCommand
             throw new DbException($response->getContent());
         }
     }
-    
 
+    /**
+     * @param $result
+     * @param null $method
+     * @param null $fetchMode
+     * @return array|mixed
+     */
     private function prepareResult($result, $method = null, $fetchMode = null)
     {
         $this->prepareResponseData($result);
-        $result = ArrayHelper::getValue($result,'data',[]);
+        $result = ArrayHelper::getValue($result, 'data', []);
         switch ($method) {
             case self::FETCH_COLUMN:
                 return array_map(function ($a) {
                     return array_values($a)[0];
-                }, $result );
+                }, $result);
                 break;
             case self::FETCH_SCALAR:
                 if (array_key_exists(0, $result)) {
@@ -337,17 +361,16 @@ class Command extends BaseCommand
                 break;
         }
 
-        if($fetchMode == self::FETCH_MODE_ALL){
+        if ($fetchMode == self::FETCH_MODE_ALL) {
             return $this->getStatementData($result);
         }
 
-        if($fetchMode == self::FETCH_MODE_TOTAL){
+        if ($fetchMode == self::FETCH_MODE_TOTAL) {
             return $this->getTotals();
         }
 
         return $result;
     }
-
 
     /**
      * Parse response with data
@@ -361,40 +384,50 @@ class Command extends BaseCommand
         $contentType = $response
             ->getHeaders()
             ->get('Content-Type');
-        
+
         list($type) = explode(';', $contentType);
-        
+
         $type = strtolower($type);
         $hash = [
             'application/json' => 'parseJson'
         ];
 
-        $result = (isset($hash[$type]))? $this->{$hash[$type]}($response->content) : $response->content;
-        return  $result;
+        $result = (isset($hash[$type])) ? $this->{$hash[$type]}($response->content) : $response->content;
+        return $result;
     }
 
+    /**
+     * @param $result
+     */
     private function prepareResponseData($result)
     {
-        if(!is_array($result)){
+        if (!is_array($result)) {
             return;
         }
         $this->_is_result = true;
-        foreach (['meta', 'data', 'totals', 'extremes', 'rows', 'rows_before_limit_at_least','statistics'] as $key) {
-            if (isset($result[$key])) {
-                $attr = "_". $key;
+        foreach (['meta', 'data', 'totals', 'extremes', 'rows', 'rows_before_limit_at_least', 'statistics'] as $key) {
+            if (array_key_exists($key, $result)) {
+                $attr = "_{$key}";
                 $this->{$attr} = $result[$key];
             }
         }
     }
 
+    /**
+     * @param $content
+     * @return mixed
+     */
     private function parseJson($content)
     {
         return Json::decode($content);
     }
 
+    /**
+     * @throws DbException
+     */
     private function ensureQueryExecuted()
     {
-        if( true !== $this->_is_result ) {
+        if (true !== $this->_is_result) {
             throw new DbException('Query was not executed yet');
         }
     }
@@ -415,7 +448,7 @@ class Command extends BaseCommand
      */
     public function getData()
     {
-        if($this->_is_result === null && !empty($this->getSql())){
+        if ($this->_is_result === null && !empty($this->getSql())) {
             $this->queryInternal(null);
         }
         $this->ensureQueryExecuted();
@@ -439,16 +472,16 @@ class Command extends BaseCommand
     {
         $sql = $this->getSql();
         $meta = $this->getMeta();
-        if (!preg_match('#^SELECT#is', $sql)){
+        if (!preg_match('#^SELECT#is', $sql)) {
             throw new DbException('Query was not SELECT type');
         }
         $table = "CREATE TABLE x (\n    ";
         $columns = [];
-        foreach ($meta as $item){
-            $columns[] = '`'. $item['name']. '` ' . $item['type'];
+        foreach ($meta as $item) {
+            $columns[] = '`' . $item['name'] . '` ' . $item['type'];
         }
-        $table.= implode(",\n    ", $columns);
-        $table.="\n)";
+        $table .= implode(",\n    ", $columns);
+        $table .= "\n)";
 
         return $table;
     }
@@ -461,7 +494,6 @@ class Command extends BaseCommand
         $this->ensureQueryExecuted();
         return $this->_totals;
     }
-    
 
     /**
      * @return mixed
@@ -541,7 +573,7 @@ class Command extends BaseCommand
             $columns = $this->db->getSchema()->getTableSchema($table)->columnNames;
         }
         $sql = 'INSERT INTO ' . $this->db->getSchema()->quoteTableName($table) . ' (' . implode(', ', $columns) . ')' . ' FORMAT ' . $format;
-        
+
         Yii::info($sql, $categoryLog);
         Yii::beginProfile($sql, $categoryLog);
 
@@ -595,19 +627,20 @@ class Command extends BaseCommand
             'query' => $sql,
         ]);
         foreach ($files as $key => $file) {
-            if(($handle = fopen($file, 'r')) !== false) {
+            if (($handle = fopen($file, 'r')) !== false) {
                 $buffer = '';
-                $count =  $part = 0;
+                $count = $part = 0;
                 while (($line = fgets($handle)) !== false) {
-                    $buffer.= $line;
+                    $buffer .= $line;
                     $count++;
-                    if($count >= $size ){
-                        $responses[$key]['part_' . ( $part++) ] = ($this->makeBatchInsert($url, $buffer)->send());
-                        $buffer = '';  $count = 0;
+                    if ($count >= $size) {
+                        $responses[$key]['part_' . ($part++)] = ($this->makeBatchInsert($url, $buffer)->send());
+                        $buffer = '';
+                        $count = 0;
                     }
                 }
-                if(!empty($buffer)){
-                    $responses[$key]['part_' . ( $part++) ] = ($this->makeBatchInsert($url, $buffer)->send());
+                if (!empty($buffer)) {
+                    $responses[$key]['part_' . ($part++)] = ($this->makeBatchInsert($url, $buffer)->send());
                 }
                 fclose($handle);
             }
@@ -617,13 +650,13 @@ class Command extends BaseCommand
         return $responses;
     }
 
-
     /**
      * @param $url
      * @param $data
      * @return Request
      */
-    private function makeBatchInsert($url,$data){
+    private function makeBatchInsert($url, $data)
+    {
         /** @var Request $request */
         $request = $this->db->transport->createRequest();
         $request->setFullUrl($url);
@@ -631,7 +664,6 @@ class Command extends BaseCommand
         $request->setContent($data);
         return $request;
     }
-
 
     /**
      * Creates a batch INSERT command.
@@ -650,4 +682,5 @@ class Command extends BaseCommand
         $sql = $this->db->getQueryBuilder()->batchInsert($table, $columns, $rows);
         return $this->setSql($sql);
     }
+
 }
