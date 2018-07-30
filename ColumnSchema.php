@@ -96,8 +96,14 @@ class ColumnSchema extends BaseObject
      */
     public function dbTypecast($value)
     {
+        if ($value !== null ) {
+            if($this->phpType === Schema::TYPE_STRING && in_array($this->type, [Schema::TYPE_BIGINT, Schema::TYPE_BIGFLOAT])){
+                return new Expression($value);
+            }
+        }
         return $this->typecast($value);
     }
+
 
     /**
      * Converts the input value according to [[phpType]] after retrieval from the database.
@@ -131,9 +137,6 @@ class ColumnSchema extends BaseObject
         switch ($this->phpType) {
             case Schema::TYPE_RESOURCE:
             case Schema::TYPE_STRING:
-                if ($this->type === Schema::TYPE_BIGINT) {
-                    return new Expression($value);
-                }
                 if (is_resource($value)) {
                     return $value;
                 }
@@ -151,7 +154,6 @@ class ColumnSchema extends BaseObject
             case Schema::TYPE_DOUBLE:
                 return (float)$value;
         }
-
         return $value;
     }
 }

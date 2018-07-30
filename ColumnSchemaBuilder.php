@@ -4,12 +4,14 @@
  * @copyright 2016 NRE
  */
 
-
 namespace kak\clickhouse;
-
 
 use yii\db\ColumnSchemaBuilder as BaseColumnSchemaBuilder;
 
+/**
+ * Class ColumnSchemaBuilder
+ * @package kak\clickhouse
+ */
 class ColumnSchemaBuilder extends BaseColumnSchemaBuilder
 {
     /**

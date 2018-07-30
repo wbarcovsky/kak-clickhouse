@@ -9,6 +9,7 @@ use yii\helpers\ArrayHelper;
 class Schema extends \yii\db\Schema
 {
     const TYPE_RESOURCE = 'resource';
+    const TYPE_BIGFLOAT = 'bigfloat';
 
     /** @var $db Connection */
     public $db;
@@ -22,8 +23,8 @@ class Schema extends \yii\db\Schema
         'Int16' => self::TYPE_INTEGER,
         'Int32' => self::TYPE_INTEGER,
         'Int64' => self::TYPE_BIGINT,
-        'Float32' => self::TYPE_FLOAT,
-        'Float64' => self::TYPE_FLOAT,
+        'Float32' => self::TYPE_BIGFLOAT,
+        'Float64' => self::TYPE_BIGFLOAT,
         'String' => self::TYPE_STRING,
         'FixedString' => self::TYPE_CHAR,
         'Date' => self::TYPE_DATE,
@@ -165,6 +166,41 @@ class Schema extends \yii\db\Schema
 
         return null;
     }
+
+    /**
+     * Extracts the PHP type from abstract DB type.
+     * @param ColumnSchema $column the column schema information
+     * @return string PHP type name
+     */
+    protected function getColumnPhpType($column)
+    {
+        static $typeMap = [
+            // abstract type => php type
+            self::TYPE_TINYINT => 'integer',
+            self::TYPE_SMALLINT => 'integer',
+            self::TYPE_INTEGER => 'integer',
+            self::TYPE_BIGINT => 'integer',
+            self::TYPE_BIGFLOAT => 'string',
+            self::TYPE_BOOLEAN => 'boolean',
+            self::TYPE_FLOAT => 'double',
+            self::TYPE_DOUBLE => 'double',
+            self::TYPE_BINARY => 'resource',
+            self::TYPE_JSON => 'array',
+        ];
+        if (isset($typeMap[$column->type])) {
+            if ($column->type === 'bigint') {
+                return PHP_INT_SIZE === 8 && !$column->unsigned ? 'integer' : 'string';
+            } elseif ($column->type === 'integer') {
+                return PHP_INT_SIZE === 4 && $column->unsigned ? 'string' : 'integer';
+            }
+
+            return $typeMap[$column->type];
+        }
+
+        return 'string';
+    }
+
+
 
     /**
      * Loads the column information into a [[ColumnSchema]] object.
