@@ -14,6 +14,8 @@ class Schema extends \yii\db\Schema
     /** @var $db Connection */
     public $db;
 
+    public $columnSchemaClass = ColumnSchema::class;
+
     public $typeMap = [
         'UInt8' => self::TYPE_SMALLINT,
         'UInt16' => self::TYPE_INTEGER,

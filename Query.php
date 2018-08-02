@@ -29,6 +29,7 @@ class Query extends BaseQuery
     /** @var bool  */
     private $_withTotals = false;
 
+    public $sql;
     /**
      * @var null
      */
@@ -47,9 +48,12 @@ class Query extends BaseQuery
         if ($db === null) {
             $db = \Yii::$app->get('clickhouse');
         }
-        list ($sql, $params) = $db->getQueryBuilder()->build($this);
-
-
+        if($this->sql === null){
+            list ($sql, $params) = $db->getQueryBuilder()->build($this);
+        }else{
+            $sql = $this->sql;
+            $params = $this->params;
+        }
         $this->_command = $db->createCommand($sql, $params);
         return $this->_command;
     }
